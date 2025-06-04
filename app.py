@@ -1,19 +1,17 @@
-# Import necessary libraries
 import streamlit as st
 import cv2
 import numpy as np
 import time
 import mediapipe as mp
 import os
-import gdown
+import gdown  
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
 from math import dist
 
-# Streamlit basic page configuration
 st.set_page_config(page_title="Emotion Detection", layout="centered")
 
-# Load and cache emotion detection model
+
 @st.cache_resource
 def load_emotion_model():
     model_path = "emotion_model.h5"
@@ -22,24 +20,22 @@ def load_emotion_model():
         gdown.download(f"https://drive.google.com/uc?id={file_id}", model_path, quiet=False)
     return load_model(model_path)
 
-# Constants for blink detection and image size
+
 EAR_THRESHOLD = 0.21
 CONSEC_FRAMES = 3
 IMG_SIZE = 48
 EYE_LANDMARKS = [33, 160, 158, 133, 153, 144]
 emotion_labels = ['angry', 'fear', 'happy', 'neutral', 'sad']
 
-# Load trained CNN model
+# Load the model
 model = load_emotion_model()
 
-# Sidebar for selecting mode
+# Streamlit UI layout toggle
 mode = st.sidebar.radio("Choose Mode", ["Real-Time Detection", "Capture Image"])
 
-# Initialize placeholders
 FRAME_WINDOW = st.image([])
 status_placeholder = st.markdown("")
 
-# Real-Time Webcam Mode
 if mode == "Real-Time Detection":
     with st.spinner("Starting webcam..."):
         cap = cv2.VideoCapture(0)
@@ -53,7 +49,6 @@ if mode == "Real-Time Detection":
         last_blink_time = time.time()
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-        # Calculate Eye Aspect Ratio (EAR)
         def calculate_ear(landmarks, w, h):
             p1 = (int(landmarks[0].x * w), int(landmarks[0].y * h))
             p2 = (int(landmarks[1].x * w), int(landmarks[1].y * h))
@@ -63,7 +58,6 @@ if mode == "Real-Time Detection":
             p6 = (int(landmarks[5].x * w), int(landmarks[5].y * h))
             return (dist(p2, p6) + dist(p3, p5)) / (2.0 * dist(p1, p4))
 
-        # Process webcam frames
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
@@ -79,7 +73,6 @@ if mode == "Real-Time Detection":
             face_detected = False
             is_live_face = False
 
-            # Blink detection
             if result.multi_face_landmarks:
                 landmarks = result.multi_face_landmarks[0]
                 eye_points = [landmarks.landmark[i] for i in EYE_LANDMARKS]
@@ -94,7 +87,6 @@ if mode == "Real-Time Detection":
                     frame_counter = 0
                 face_detected = True
 
-            # Face movement check
             if len(faces) > 0:
                 (x, y, w_box, h_box) = faces[0]
                 if prev_face_coords:
@@ -104,18 +96,15 @@ if mode == "Real-Time Detection":
                         last_movement_time = time.time()
                 prev_face_coords = (x, y)
 
-            # Determine if face is live (not spoofed)
             time_since_blink = time.time() - last_blink_time
             time_since_move = time.time() - last_movement_time
             is_live_face = (time_since_blink < 3) and (time_since_move < 3)
 
-            # Show liveness status on frame
             if is_live_face:
                 cv2.putText(rgb, "LIVE FACE", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2)
             else:
                 cv2.putText(rgb, "SPOOF DETECTED", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-            # Emotion prediction if face is valid and live
             if face_detected and is_live_face and len(faces) > 0:
                 (x, y, w_box, h_box) = faces[0]
                 face_roi = gray[y:y + h_box, x:x + w_box]
@@ -142,13 +131,11 @@ if mode == "Real-Time Detection":
                     "<div class='status' style='background-color:#fff3e0;color:#e65100;'>Waiting for face...</div>",
                     unsafe_allow_html=True)
 
-            # Show frame in Streamlit
             FRAME_WINDOW.image(rgb)
 
-        # Release the camera after use
-        cap.release()
+    cap.release()
 
-# Session state defaults for camera mode
+# Initialize session state
 if "camera_active" not in st.session_state:
     st.session_state.camera_active = False
 if "photo_taken" not in st.session_state:
@@ -156,23 +143,23 @@ if "photo_taken" not in st.session_state:
 if "captured_image" not in st.session_state:
     st.session_state.captured_image = None
 
-# Capture Image Mode
-else:
-    # Camera control buttons
+else:  # Capture Image Mode
+
+    # Start/Stop Buttons
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Start Camera"):
+        if st.button("📷 Start Camera"):
             st.session_state.camera_active = True
             st.session_state.photo_taken = False
             st.session_state.captured_image = None
 
     with col2:
-        if st.button("Stop Camera"):
+        if st.button("🛑 Stop Camera"):
             st.session_state.camera_active = False
             st.session_state.photo_taken = False
             st.session_state.captured_image = None
 
-    # Capture photo from camera
+    # Display camera and capture photo
     if st.session_state.camera_active and not st.session_state.photo_taken:
         uploaded_img = st.camera_input("Take a photo")
 
@@ -180,7 +167,7 @@ else:
             st.session_state.photo_taken = True
             st.session_state.captured_image = uploaded_img
 
-    # Predict emotion from captured photo
+    # Analyze after photo taken
     if st.session_state.photo_taken and st.session_state.captured_image is not None:
         file_bytes = np.asarray(bytearray(st.session_state.captured_image.read()), dtype=np.uint8)
         frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
