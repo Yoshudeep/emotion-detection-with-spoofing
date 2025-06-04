@@ -35,6 +35,10 @@ mode = st.sidebar.radio("Choose Mode", ["Real-Time Detection", "Capture Image"])
 
 FRAME_WINDOW = st.image([])
 status_placeholder = st.markdown("")
+# Reset session state when entering real-time detection
+st.session_state.camera_active = False
+st.session_state.photo_taken = False
+st.session_state.captured_image = None
 
 if mode == "Real-Time Detection":
     with st.spinner("Starting webcam..."):
